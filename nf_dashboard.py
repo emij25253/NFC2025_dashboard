@@ -313,6 +313,13 @@ def display_singleSpeed(selected_flight):
 
     st.metric("Speed",  f"{latest['Speed']:.1f}", f"{latest['Speed']-prev['Speed']:+.1f}")
 
+def display_battery(selected_flight):
+        df = pd.DataFrame(selected_flight)
+    if df.empty:
+        st.info("no battery data")
+        
+    st.write(df.iloc[-1]['batteryVoltage'])
+
 # --- Display live flight ---
 def display_live_flight(selected_live):
     col1, col2, col3 = st.columns(3)
@@ -331,6 +338,8 @@ def display_live_flight(selected_live):
     display_map(selected_live)
     
     display_distance_travelled(selected_live)
+
+    display_battery(selected_live)
 
 def display_archive(selected_archive):
     col1, col2, col3 = st.columns(3)
@@ -374,8 +383,8 @@ with tab1:
 
 with tab2:
     st.header("Archived Flights")
-    '''
-    selected_archive = st.selectbox("Choose a flight", archive_keys)
-    if selected_archive is not None:
-        display_archive(archived_flights_df[selected_archive])
-    '''
+    
+    #selected_archive = st.selectbox("Choose a flight", archive_keys)
+    #if selected_archive is not None:
+    #    display_archive(archived_flights_df[selected_archive])
+

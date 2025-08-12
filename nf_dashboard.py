@@ -315,7 +315,7 @@ def display_singleSpeed(selected_flight):
     st.metric("Speed",  f"{latest['Speed']:.1f}", f"{latest['Speed']-prev['Speed']:+.1f}")
 
 def display_battery(selected_flight):
-        df = pd.DataFrame(selected_flight)
+    df = pd.DataFrame(selected_flight)
     if df.empty:
         st.info("no battery data")
         
@@ -388,5 +388,6 @@ with tab2:
     #selected_archive = st.selectbox("Choose a flight", archive_keys)
     #if selected_archive is not None:
     #    display_archive(archived_flights_df[selected_archive])
+
 
 

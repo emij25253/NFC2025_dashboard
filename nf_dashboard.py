@@ -18,7 +18,8 @@ DATA_FREQUENCY = 5 #data points per second
 interval = STANDARD_REFRESH
 st_autorefresh(interval=interval, key="app_refresh")
 
-cred = credentials.Certificate(r"D:\Neues Fliegen\Datalogger\Dashboard\Firebase DB\datalogger-nfc25-firebase-adminsdk-fbsvc-9fb825c058.json")
+firebase_creds = st.secrets["firebase"]
+cred = credentials.Certificate(dict(firebase_creds))
 if not firebase_admin._apps:
     firebase_admin.initialize_app(cred, {
         'databaseURL': r"https://datalogger-nfc25-default-rtdb.europe-west1.firebasedatabase.app"
@@ -387,4 +388,5 @@ with tab2:
     #selected_archive = st.selectbox("Choose a flight", archive_keys)
     #if selected_archive is not None:
     #    display_archive(archived_flights_df[selected_archive])
+
 

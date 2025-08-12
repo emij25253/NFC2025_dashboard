@@ -319,7 +319,7 @@ def display_battery(selected_flight):
     if df.empty:
         st.info("no battery data")
         
-    st.write(df.iloc[-1]['batteryVoltage'])
+    st.write("Battery status: ", df.iloc[-1]['batteryVoltage'], "V")
 
 # --- Display live flight ---
 def display_live_flight(selected_live):
@@ -388,6 +388,7 @@ with tab2:
     #selected_archive = st.selectbox("Choose a flight", archive_keys)
     #if selected_archive is not None:
     #    display_archive(archived_flights_df[selected_archive])
+
 
 
 

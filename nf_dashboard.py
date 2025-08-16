@@ -4,6 +4,7 @@ import firebase_admin
 from firebase_admin import db, credentials
 import pandas as pd
 import numpy as np
+from math import radians, sin, cos, atan2, sqrt, isnan
 from streamlit_autorefresh import st_autorefresh
 from geopy.distance import geodesic
 import plotly.express as px
@@ -113,6 +114,69 @@ def init_filters():
         for c in GPS_COLS:
             st.session_state["filters"][c] = GPSFilter(window_size=5)
 
+def compute_RPY(accX, accY, accZ, magX, magY, magZ): #implement other later
+    accX = np.asarray(accX, dtype=float)
+    accY = np.asarray(accY, dtype=float)
+    accZ = np.asarray(accZ, dtype=float)
+    magX = np.asarray(magX, dtype=float)
+    magY = np.asarray(magY, dtype=float)
+    magZ = np.asarray(magZ, dtype=float)
+    pitch = np.atan2(accY, np.sqrt((accX * accX) + (accZ * accZ)))
+    roll = np.atan2(-accX , np.sqrt((accY * accY) + (accZ * accZ)))
+    yaw = np.atan2((magY * np.cos(roll)) - (magZ * np.sin(roll)), (magX * np.cos(pitch)) + (magY * np.sin(roll)*np.sin(pitch)) + (magZ * np.cos(roll) * np.sin(pitch)))
+    roll_deg = np.degrees(roll)
+    pitch_deg = np.degrees(pitch)
+    yaw_deg = np.degrees(yaw)
+
+def distanceBetween(lat1, lon1, lat2, lon2) -> float:
+    try:
+        lat1 = float(lat1); lon1 = float(lon1)
+        lat2 = float(lat2); lon2 = float(lon2)
+    except (TypeError, ValueError):
+        return 0.0
+    
+    if any(isnan(v) for v in (lat1, lon1, lat2, lon2)):
+        return 0.0
+    if not (-90 <= lat1 <= 90 and -180 <= lon1 <= 180 and
+            -90 <= lat2 <= 90 and -180 <= lon2 <= 180):
+        return 0.0
+    if (lat1 == 0 and lon1 == 0) or (lat2 == 0 and lon2 == 0):
+        return 0.0
+    
+    dphi = radians(lat2 - lat1)
+    dlmb = radians(lon2 - lon1)
+    phi1, phi2 = radians(lat1), radians(lat2)
+    a = sin(dphi/2)**2 + cos(phi1)*cos(phi2)*sin(dlmb/2)**2
+    
+    return 2 * 6_371_000.0 * atan2(sqrt(a), sqrt(1 - a))
+
+def append_cum_distance(df, lat_col, lon_col):
+    lat = pd.to_numeric(df[lat_col], errors="coerce").to_numpy(dtype=float)
+    lon = pd.to_numeric(df[lon_col], errors="coerce").to_numpy(dtype=float)
+
+    lat_prev = np.roll(lat, 1); lat_prev[0] = lat[0]
+    lon_prev = np.roll(lon, 1); lon_prev[0] = lon[0]
+
+    vec_dist = np.vectorize(distanceBetween, otypes=[float])
+    seg_dist = vec_dist(lat_prev, lon_prev, lat, lon)
+    seg_dist[0] = 0.0
+
+    df["segmentDistance"]   = seg_dist
+    df["distanceTravelled"] = np.cumsum(seg_dist)
+
+def recompute_all_distance():
+    df = st.session_state.get("processed_df")
+    if df is None or df.empty:
+        return
+    # Prefer filtered columns if available
+    lat_col = "latitude_f" if "latitude_f" in df.columns else "latitude"
+    lon_col = "longitude_f" if "longitude_f" in df.columns else "longitude"
+    if lat_col not in df.columns or lon_col not in df.columns:
+        return
+    df.sort_values("millis", kind="stable", inplace=True, ignore_index=True)
+    append_cum_distance(df, lat_col, lon_col)
+
+
 def process_batch(raw_df: pd.DataFrame) -> pd.DataFrame:
     if raw_df is None or raw_df.empty:
         return raw_df
@@ -145,7 +209,15 @@ def process_batch(raw_df: pd.DataFrame) -> pd.DataFrame:
         for col in GPS_COLS:
             if col in df_out.columns:
                 df_out[f"{col}_f"] = df_out[col].to_numpy()
+    
+    # --- Calculate Roll Pitch Yaw (in degrees)---
+    df_out[["roll", "pitch", "yaw"]] = compute_RPY(df_out["accX"], df_out["accY"], df_out["accZ"], df_out["magX"], df_out["magY"], df_out["magZ"])
 
+    # --- Calculate distance travelled (meters) ---
+    lat_col = "latitude_f"  if "latitude_f"  in df_out.columns else "latitude"
+    lon_col = "longitude_f" if "longitude_f" in df_out.columns else "longitude"
+    if lat_col in df_out.columns and lon_col in df_out.columns:
+        append_cum_distance(df_out, lat_col, lon_col)
     return df_out
 
 def append_state(new_raw, new_processed):
@@ -157,7 +229,6 @@ def append_state(new_raw, new_processed):
         pd.concat([st.session_state["processed_df"], new_processed], ignore_index=True)
         if "processed_df" in st.session_state else new_processed
     )
-    st.session_state["last_seen_millis"] = int(st.session_state["raw_df"]["millis"].max())
     if not st.session_state["raw_df"].empty:
         st.session_state["last_seen_millis"] = int(st.session_state["raw_df"]["millis"].max())
 
@@ -191,15 +262,18 @@ if "raw_df" not in st.session_state:
     init_filters()
     df_raw = to_raw_df(data)
     if not df_raw.empty:
-        df_processed = process_batch(df_raw)              # uses stateful filters
+        df_processed = process_batch(df_raw)   # no distance here
         append_state(df_raw, df_processed)
+        recompute_all_distance()               # compute on WHOLE processed_df
 
-#--- Fetch new data ---
+# --- Fetch new data ---
 new_data = fetch_new_data('/live', st.session_state.get("last_seen_millis", -1))
-df_new_raw = to_raw_df(new_data)               # just the new rows
+df_new_raw = to_raw_df(new_data)
 if not df_new_raw.empty:
-    df_new_processed = process_batch(df_new_raw)
-    append_state(df_new_raw, df_new_processed)  
+    df_new_processed = process_batch(df_new_raw)  # no distance here
+    append_state(df_new_raw, df_new_processed)
+    recompute_all_distance()                      # recompute once on all rows
+
 
 #---------------- PLOTTING DATA --------------------------------------------
 
@@ -253,23 +327,15 @@ def display_map(selected_flight):
         df = df[["latitude", "longitude"]].tail(1)
     st.map(data=df, latitude=None, longitude=None, color=None, size=1, zoom=20, use_container_width=True, width=None, height=None)
 
-def display_distance_travelled(selected_flight):
-    df = pd.DataFrame(selected_flight)
-    df["distances"] = 0.0  # initialize column with floats
-    distance_travelled = 0.0
+def display_distance_travelled(df):
+    last_row = df.iloc[-1]
 
-    for i in range(len(df) - 1):
-        lat1, lon1 = df.loc[i, "latitude"], df.loc[i, "longitude"]
-        lat2, lon2 = df.loc[i + 1, "latitude"], df.loc[i + 1, "longitude"]
+    last_lat = last_row["latitude"]      # or "latitude_f" if you use the filtered one
+    last_lon = last_row["longitude"]     # or "longitude_f"
 
-        if pd.notna(lat1) and pd.notna(lon1) and pd.notna(lat2) and pd.notna(lon2):
-            distance_travelled += geodesic((lat1, lon1), (lat2, lon2)).meters
-    
-    df.loc[i + 1, "distances"] = distance_travelled
-    st.write("Total distance travelled: ", distance_travelled)
+    last_dist = last_row["distanceTravelled"]
 
-
-    df = pd.DataFrame(selected_flight)
+    st.write("Last point:", last_lat, last_lon, " | total distance:", last_dist, " meters")
 
 # ---------- “current-value only” widgets ----------------
 def display_singleAcc(selected_flight):
@@ -397,6 +463,7 @@ with tab2:
     #selected_archive = st.selectbox("Choose a flight", archive_keys)
     #if selected_archive is not None:
     #    display_archive(archived_flights_df[selected_archive])
+
 
 
 

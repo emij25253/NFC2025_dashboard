@@ -1,4 +1,5 @@
 import streamlit as st
+import requests
 import firebase_admin
 from firebase_admin import db, credentials
 import pandas as pd
@@ -24,6 +25,7 @@ if not firebase_admin._apps:
     firebase_admin.initialize_app(cred, {
         'databaseURL': r"https://datalogger-nfc25-default-rtdb.europe-west1.firebasedatabase.app"
     }) 
+databaseURL = r"https://datalogger-nfc25-default-rtdb.europe-west1.firebasedatabase.app"
 
 #---------------- FILTERING METHODS --------------------------------------------
 class RealTimeGaussianFilter:
@@ -379,6 +381,13 @@ else:
 st.set_page_config(layout="wide")
 with tab1:
     st.header("Dashboard (Live)")
+    st.warning("⚠️ This will clear ALL data under `/live` permanently.")
+    confirm = st.checkbox("I understand and want to proceed")
+    if st.button("🧹 Clear live data", disabled=not confirm):
+        requests.put(databaseURL, json={})
+        st.session_state.clear()  # optional: reset local state
+    st.success("✅ /live cleared")
+        
     show_live_dashboard()
     
 
@@ -388,6 +397,7 @@ with tab2:
     #selected_archive = st.selectbox("Choose a flight", archive_keys)
     #if selected_archive is not None:
     #    display_archive(archived_flights_df[selected_archive])
+
 
 
 

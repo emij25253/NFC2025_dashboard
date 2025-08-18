@@ -17,7 +17,7 @@ STANDARD_REFRESH = 5000 #app refresh for archive (ms)
 DATA_REFRESH = 0.5 #dataframe update rate (ms)
 DATA_FREQUENCY = 5 #data points per second
 
-interval = STANDARD_REFRESH
+interval = LIVE_REFRESH
 st_autorefresh(interval=interval, key="app_refresh")
 
 firebase_creds = st.secrets["firebase"]
@@ -463,6 +463,7 @@ with tab2:
     #selected_archive = st.selectbox("Choose a flight", archive_keys)
     #if selected_archive is not None:
     #    display_archive(archived_flights_df[selected_archive])
+
 
 
 

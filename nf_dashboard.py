@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 
 
 #naming convention for course flight vs endurance flight
-LIVE_REFRESH = 100 #app refresh when live (ms)
+LIVE_REFRESH = 200 #app refresh when live (ms)
 STANDARD_REFRESH = 5000 #app refresh for archive (ms)
 DATA_REFRESH = 0.5 #dataframe update rate (ms)
 DATA_FREQUENCY = 5 #data points per second
@@ -463,6 +463,7 @@ with tab2:
     #selected_archive = st.selectbox("Choose a flight", archive_keys)
     #if selected_archive is not None:
     #    display_archive(archived_flights_df[selected_archive])
+
 
 
 

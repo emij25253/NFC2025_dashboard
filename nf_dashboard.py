@@ -181,7 +181,7 @@ def process_batch(raw_df: pd.DataFrame) -> pd.DataFrame:
     if raw_df is None or raw_df.empty:
         return raw_df
 
-    df_out = raw_df.sort_values("millis", kind="stable").reset_index(drop=True).copy()
+    #df_out = raw_df.sort_values("millis", kind="stable").reset_index(drop=True).copy()
 
     # --- Gaussian-filtered sensor columns (stateful, per column) ---
     for col in GAUSS_COLS:
@@ -482,6 +482,7 @@ st.header("Dashboard (Live)")
     #st.success("✅ /live cleared")
 show_live_dashboard()
     
+
 
 
 

@@ -320,6 +320,20 @@ def display_rpy(selected_flight): #calcuate rpy
     fig.update_yaxes(range=[-180, 180])
     st.plotly_chart(fig, use_container_width=True)
 
+def display_gyro(df):
+    df_melted = df.melt(id_vars=["t_s"], value_vars=["gyroX", "gyroY", "gyroZ"], var_name="Axis", value_name="Angular Acceleration")
+
+    fig = px.line(
+        df_melted,
+        x="t_s",
+        y="Angular Acceleration",
+        color="Axis",
+        title="Angular Acceleration",
+        labels={"t_s": "Time (s)", "Angular Acceleration": "degrees"},
+    )
+    fig.update_yaxes(range=[-180, 180])
+    st.plotly_chart(fig, use_container_width=True)
+
 def display_map(selected_flight):
     df = pd.DataFrame(selected_flight)
     if df.empty:
@@ -373,6 +387,22 @@ def display_singleRPY(selected_flight):
         st.metric("Pitch (°)", f"{latest['gyroY']:.1f}", f"{latest['gyroY']-prev['gyroY']:+.1f}")
     with c3:
         st.metric("Yaw (°)",   f"{latest['gyroZ']:.1f}", f"{latest['gyroZ']-prev['gyroZ']:+.1f}")
+
+def display_singleGyro(df):
+        
+    if df.empty:
+        st.info("No gyroscope data yet."); return
+
+    latest = df.iloc[-1]
+    prev   = df.iloc[-2] if len(df) > 1 else latest
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("GyroX (°/s)",  f"{latest['gyroX']:.1f}", f"{latest['gyroX']-prev['gyroX']:+.1f}")
+    with c2:
+        st.metric("GyroY (°/s)", f"{latest['gyroY']:.1f}", f"{latest['gyroY']-prev['gyroY']:+.1f}")
+    with c3:
+        st.metric("GyroZ (°/s)",   f"{latest['gyroZ']:.1f}", f"{latest['gyroZ']-prev['gyroZ']:+.1f}")
 
 def display_singleSpeed(selected_flight):
     df = pd.DataFrame(selected_flight)
@@ -465,6 +495,7 @@ with tab2:
     #selected_archive = st.selectbox("Choose a flight", archive_keys)
     #if selected_archive is not None:
     #    display_archive(archived_flights_df[selected_archive])
+
 
 
 

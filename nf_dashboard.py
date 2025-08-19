@@ -329,7 +329,7 @@ def display_gyro(df):
         y="Angular Acceleration",
         color="Axis",
         title="Angular Acceleration",
-        labels={"t_s": "Time (s)", "Angular Acceleration": "degrees"},
+        labels={"t_s": "Time (s)", "Angular Acceleration": "degrees / sec"},
     )
     fig.update_yaxes(range=[-180, 180])
     st.plotly_chart(fig, use_container_width=True)
@@ -423,7 +423,7 @@ def display_battery(selected_flight):
 
 # --- Display live flight ---
 def display_live_flight(selected_live):
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         display_singleSpeed(selected_live)
         display_speed(selected_live)
@@ -435,6 +435,10 @@ def display_live_flight(selected_live):
     with col3:
         display_singleRPY(selected_live)
         display_rpy(selected_live)
+
+    with col4:
+        display_singleGyro(selected_live)
+        display_gyro(selected_live)
     
     display_map(selected_live)
     
@@ -495,6 +499,7 @@ with tab2:
     #selected_archive = st.selectbox("Choose a flight", archive_keys)
     #if selected_archive is not None:
     #    display_archive(archived_flights_df[selected_archive])
+
 
 
 

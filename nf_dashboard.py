@@ -83,12 +83,21 @@ def _iter_children(node):
             if v is not None:
                 yield str(i), v
 
-def init_firebase():
-    cred = credentials.Certificate(r"D:\Neues Fliegen\Datalogger\Dashboard\Firebase DB\datalogger-nfc25-firebase-adminsdk-fbsvc-9fb825c058.json")
-    if not firebase_admin._apps:
-        firebase_admin.initialize_app(cred, {
-            'databaseURL': r"https://datalogger-nfc25-default-rtdb.europe-west1.firebasedatabase.app"
-        }) 
+DATABASE_URL = "https://datalogger-nfc25-default-rtdb.europe-west1.firebasedatabase.app"
+
+class db:
+    @staticmethod
+    def reference(path: str):
+        class _Ref:
+            def __init__(self, base, p):
+                self.base = base.rstrip("/")
+                self.path = "/" + p.strip("/")
+            def get(self):
+                url = f"{self.base}{self.path}.json"
+                r = requests.get(url, timeout=10)
+                r.raise_for_status()
+                return r.json()
+        return _Ref(DATABASE_URL, path)
 
 def to_df_from_node(node) -> pd.DataFrame:
     """
@@ -490,7 +499,6 @@ def show_live_dashboard():
     display_live_flight(selected)
 
 def main():
-    init_firebase()
     ensure_state()
 
     # Initial one-time load for all flights (creates empty frames for missing/empty nodes)
@@ -502,6 +510,7 @@ def main():
 if __name__ == "__main__":
     main()
     
+
 
 
 

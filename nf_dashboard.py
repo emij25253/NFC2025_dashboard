@@ -410,7 +410,7 @@ def display_distance_travelled(df):
 
     last_dist = last_row["distanceTravelled"]
 
-    st.write("Last point:", last_lat, last_lon, " | **{Total distance:", f"{last_dist:.2f}", " meters"}**)
+    st.markdown(f"Last point: {last_lat}, {last_lon} | **Total distance: {last_dist:.2f} meters**")
 
 def display_battery(selected_flight):
     df = pd.DataFrame(selected_flight)
@@ -463,6 +463,7 @@ st.header("Dashboard (Live)")
 
 show_live_dashboard()
     
+
 
 
 

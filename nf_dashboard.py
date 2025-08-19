@@ -9,8 +9,6 @@ from streamlit_autorefresh import st_autorefresh
 import plotly.express as px
 from typing import Dict, Any, Tuple
 
-
-#naming convention for course flight vs endurance flight
 LIVE_REFRESH = 100 #app refresh when live (ms)
 STANDARD_REFRESH = 5000 #app refresh for archive (ms)
 TEAMS = [str(i) for i in range(1, 10)]      # "1".."9"
@@ -510,6 +508,7 @@ def main():
 if __name__ == "__main__":
     main()
     
+
 
 
 

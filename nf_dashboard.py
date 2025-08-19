@@ -331,7 +331,7 @@ def display_gyro(df):
         title="Angular Acceleration",
         labels={"t_s": "Time (s)", "Angular Acceleration": "degrees / sec"},
     )
-    fig.update_yaxes(range=[-180, 180])
+    fig.update_yaxes(range=[-90, 90])
     st.plotly_chart(fig, use_container_width=True)
 
 def display_map(selected_flight):
@@ -499,6 +499,7 @@ with tab2:
     #selected_archive = st.selectbox("Choose a flight", archive_keys)
     #if selected_archive is not None:
     #    display_archive(archived_flights_df[selected_archive])
+
 
 
 

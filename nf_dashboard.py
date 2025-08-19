@@ -14,8 +14,6 @@ import plotly.graph_objects as go
 #naming convention for course flight vs endurance flight
 LIVE_REFRESH = 500 #app refresh when live (ms)
 STANDARD_REFRESH = 5000 #app refresh for archive (ms)
-DATA_REFRESH = 0.5 #dataframe update rate (ms)
-DATA_FREQUENCY = 5 #data points per second
 
 interval = LIVE_REFRESH
 st_autorefresh(interval=interval, key="app_refresh")
@@ -472,33 +470,19 @@ def show_live_dashboard():
     
     display_live_flight(st.session_state['processed_df']) #change later
     
-tab1, tab2 = st.tabs(["Live Flight", "Archive"])
-selected_tab = st.session_state.get("selected_tab", "Live")
-if tab1: #refresh faster for live dashboard
-    interval = LIVE_REFRESH
-else:
-    interval = STANDARD_REFRESH
-
+#tab1 = st.tabs(["Live Flight"])
+#selected_tab = st.session_state.get("selected_tab", "Live")
 
 st.set_page_config(layout="wide")
-with tab1:
-    st.header("Dashboard (Live)")
-    st.warning("⚠️ This will clear ALL data under `/live` permanently.")
-    confirm = st.checkbox("I understand and want to proceed")
-    if st.button("🧹 Clear live data", disabled=not confirm):
-        requests.put(databaseURL, json={})
-        st.session_state.clear()  # optional: reset local state
-    st.success("✅ /live cleared")
-        
-    show_live_dashboard()
+st.header("Dashboard (Live)")
+    #st.warning("⚠️ This will clear ALL data under `/live` permanently.")
+    #confirm = st.checkbox("I understand and want to proceed")
+    #if st.button("🧹 Clear live data", disabled=not confirm):
+        #requests.put(databaseURL, json={})
+    #st.success("✅ /live cleared")
+show_live_dashboard()
     
 
-with tab2:
-    st.header("Archived Flights")
-    
-    #selected_archive = st.selectbox("Choose a flight", archive_keys)
-    #if selected_archive is not None:
-    #    display_archive(archived_flights_df[selected_archive])
 
 
 

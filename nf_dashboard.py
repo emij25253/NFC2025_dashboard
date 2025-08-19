@@ -97,6 +97,8 @@ def to_raw_df(data):
     df["millis"] = pd.to_numeric(df["millis"], errors="coerce").round().astype("Int64")
     df = df.dropna(subset=["millis"])
     df["millis"] = df["millis"].astype("int64")
+    base = int(df["millis"].min())
+    df["t_s"] = (df["millis"] - base) / 1000.0
 
     if "SatCount" in df.columns:
         df["SatCount"] = pd.to_numeric(df["SatCount"], errors="coerce").round().astype("Int64")
@@ -279,15 +281,15 @@ if not df_new_raw.empty:
 
 def display_acc(selected_flight):
     df = pd.DataFrame(selected_flight)
-    df_melted = df.melt(id_vars=["millis"], value_vars=["accX", "accY", "accZ"], var_name="Axis", value_name="Acceleration")
+    df_melted = df.melt(id_vars=["t_s"], value_vars=["accX", "accY", "accZ"], var_name="Axis", value_name="Acceleration")
 
     fig = px.line(
         df_melted,
-        x="millis",
+        x="t_s",
         y="Acceleration",
         color="Axis",
         title="Acceleration",
-        labels={"millis": "Time (s)", "Acceleration": "G"}
+        labels={"t_s": "Time (s)", "Acceleration": "G"}
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -296,24 +298,24 @@ def display_speed(selected_flight):
 
     fig = px.line(
         df,
-        x="millis",
+        x="t_s",
         y="Speed",
         title="Speed",
-        labels={"millis" : "Time (s)", "Speed" : "m/s"}
+        labels={"t_s" : "Time (s)", "Speed" : "m/s"}
     )
     st.plotly_chart(fig, use_container_width=True)
 
 def display_rpy(selected_flight): #calcuate rpy
     df = pd.DataFrame(selected_flight)
-    df_melted = df.melt(id_vars=["millis"], value_vars=["gyroX", "gyroY", "gyroZ"], var_name="Axis", value_name="Attitude")
+    df_melted = df.melt(id_vars=["t_s"], value_vars=["gyroX", "gyroY", "gyroZ"], var_name="Axis", value_name="Attitude")
 
     fig = px.line(
         df_melted,
-        x="millis",
+        x="t_s",
         y="Attitude",
         color="Axis",
         title="Roll, Pitch, Yaw",
-        labels={"millis": "Time (s)", "Attitude": "degrees"},
+        labels={"t_s": "Time (s)", "Attitude": "degrees"},
     )
     fig.update_yaxes(range=[-180, 180])
     st.plotly_chart(fig, use_container_width=True)
@@ -463,6 +465,7 @@ with tab2:
     #selected_archive = st.selectbox("Choose a flight", archive_keys)
     #if selected_archive is not None:
     #    display_archive(archived_flights_df[selected_archive])
+
 
 
 

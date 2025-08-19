@@ -23,13 +23,7 @@ GPS_COLS   = ["latitude", "longitude"] #without gpsAltitude?
 
 interval = STANDARD_REFRESH
 st_autorefresh(interval=interval, key="app_refresh")
-# Seed /live as a MAP of teams -> flights (all empty objects)
 
-cred = credentials.Certificate(r"D:\Neues Fliegen\Datalogger\Dashboard\Firebase DB\datalogger-nfc25-firebase-adminsdk-fbsvc-9fb825c058.json")
-if not firebase_admin._apps:
-    firebase_admin.initialize_app(cred, {
-        "databaseURL": "https://datalogger-nfc25-default-rtdb.europe-west1.firebasedatabase.app"
-    })
 
 #---------------- FILTERING METHODS --------------------------------------------
 class RealTimeGaussianFilter:
@@ -508,6 +502,7 @@ def main():
 if __name__ == "__main__":
     main()
     
+
 
 
 

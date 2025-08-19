@@ -332,25 +332,6 @@ def display_gyro(df):
     fig.update_yaxes(range=[-90, 90])
     st.plotly_chart(fig, use_container_width=True)
 
-def display_map(selected_flight):
-    df = pd.DataFrame(selected_flight)
-    if df.empty:
-        st.info("No valid coordinates yet.")
-        return
-    else:
-        df = df[["latitude", "longitude"]].tail(1)
-    st.map(data=df, latitude=None, longitude=None, color=None, size=1, zoom=17, use_container_width=True, width=None, height=None)
-
-def display_distance_travelled(df):
-    last_row = df.iloc[-1]
-
-    last_lat = last_row["latitude"]      # or "latitude_f" if you use the filtered one
-    last_lon = last_row["longitude"]     # or "longitude_f"
-
-    last_dist = last_row["distanceTravelled"]
-
-    st.write("Last point:", last_lat, last_lon, " | total distance:", last_dist, " meters")
-
 # ---------- “current-value only” widgets ----------------
 def display_singleAcc(selected_flight):
 
@@ -412,6 +393,25 @@ def display_singleSpeed(selected_flight):
 
     st.metric("Speed",  f"{latest['Speed']:.1f}", f"{latest['Speed']-prev['Speed']:+.1f}")
 
+def display_map(selected_flight):
+    df = pd.DataFrame(selected_flight)
+    if df.empty:
+        st.info("No valid coordinates yet.")
+        return
+    else:
+        df = df[["latitude", "longitude"]].tail(1)
+    st.map(data=df, latitude=None, longitude=None, color=None, size=1, zoom=17, use_container_width=True, width=None, height=None)
+
+def display_distance_travelled(df):
+    last_row = df.iloc[-1]
+
+    last_lat = last_row["latitude"]      # or "latitude_f" if you use the filtered one
+    last_lon = last_row["longitude"]     # or "longitude_f"
+
+    last_dist = last_row["distanceTravelled"]
+
+    st.write("Last point:", last_lat, last_lon, " | total distance:", {last_dist:.2f}, " meters")
+
 def display_battery(selected_flight):
     df = pd.DataFrame(selected_flight)
     if df.empty:
@@ -444,18 +444,6 @@ def display_live_flight(selected_live):
 
     display_battery(selected_live)
 
-def display_archive(selected_archive):
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        display_speed(selected_archive) 
-
-    with col2:
-        display_acc(selected_archive)
-
-    with col3:
-        display_rpy(selected_archive)
-    display_distance_travelled(selected_archive)
-
 
 # --- Streamlit functions - Front end ---
 
@@ -469,19 +457,13 @@ def show_live_dashboard():
     #    selected_live = st.selectbox("Watch flight:", live_keys)
     
     display_live_flight(st.session_state['processed_df']) #change later
-    
-#tab1 = st.tabs(["Live Flight"])
-#selected_tab = st.session_state.get("selected_tab", "Live")
 
 st.set_page_config(layout="wide")
 st.header("Dashboard (Live)")
-    #st.warning("⚠️ This will clear ALL data under `/live` permanently.")
-    #confirm = st.checkbox("I understand and want to proceed")
-    #if st.button("🧹 Clear live data", disabled=not confirm):
-        #requests.put(databaseURL, json={})
-    #st.success("✅ /live cleared")
+
 show_live_dashboard()
     
+
 
 
 

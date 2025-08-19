@@ -341,7 +341,7 @@ def display_map(selected_flight):
         return
     else:
         df = df[["latitude", "longitude"]].tail(1)
-    st.map(data=df, latitude=None, longitude=None, color=None, size=1, zoom=20, use_container_width=True, width=None, height=None)
+    st.map(data=df, latitude=None, longitude=None, color=None, size=1, zoom=19, use_container_width=True, width=None, height=None)
 
 def display_distance_travelled(df):
     last_row = df.iloc[-1]
@@ -499,6 +499,7 @@ with tab2:
     #selected_archive = st.selectbox("Choose a flight", archive_keys)
     #if selected_archive is not None:
     #    display_archive(archived_flights_df[selected_archive])
+
 
 
 

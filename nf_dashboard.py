@@ -1,30 +1,37 @@
 import streamlit as st
-import requests
+#import requests
 import firebase_admin
 from firebase_admin import db, credentials
 import pandas as pd
 import numpy as np
 from math import radians, sin, cos, atan2, sqrt, isnan
 from streamlit_autorefresh import st_autorefresh
-from geopy.distance import geodesic
 import plotly.express as px
-import plotly.graph_objects as go
+from typing import Dict, Any, Tuple
 
 
 #naming convention for course flight vs endurance flight
-LIVE_REFRESH = 500 #app refresh when live (ms)
+LIVE_REFRESH = 100 #app refresh when live (ms)
 STANDARD_REFRESH = 5000 #app refresh for archive (ms)
+TEAMS = [str(i) for i in range(1, 10)]      # "1".."9"
+FLIGHTS = [str(i) for i in range(1, 5)]     # "1".."4"
+ENFORCE_SORT = False
+COLUMNS = [
+    "millis","accX","accY","accZ","gyroX","gyroY","gyroZ", "magX","magY","magZ",
+    "latitude","longitude", "gpsAltitude","Speed","SatCount","batteryVoltage", "roll", "pitch", "yaw"
+]
+GAUSS_COLS = ["accX", "accY", "accZ", "gyroX", "gyroY", "gyroZ", "magX", "magY", "magZ"]
+GPS_COLS   = ["latitude", "longitude"] #without gpsAltitude?
 
-interval = LIVE_REFRESH
+interval = STANDARD_REFRESH
 st_autorefresh(interval=interval, key="app_refresh")
+# Seed /live as a MAP of teams -> flights (all empty objects)
 
-firebase_creds = st.secrets["firebase"]
-cred = credentials.Certificate(dict(firebase_creds))
+cred = credentials.Certificate(r"D:\Neues Fliegen\Datalogger\Dashboard\Firebase DB\datalogger-nfc25-firebase-adminsdk-fbsvc-9fb825c058.json")
 if not firebase_admin._apps:
     firebase_admin.initialize_app(cred, {
-        'databaseURL': r"https://datalogger-nfc25-default-rtdb.europe-west1.firebasedatabase.app"
-    }) 
-databaseURL = r"https://datalogger-nfc25-default-rtdb.europe-west1.firebasedatabase.app"
+        "databaseURL": "https://datalogger-nfc25-default-rtdb.europe-west1.firebasedatabase.app"
+    })
 
 #---------------- FILTERING METHODS --------------------------------------------
 class RealTimeGaussianFilter:
@@ -74,37 +81,117 @@ class GPSFilter:
             return float(np.round(np.dot(np.array(self.gps_readings), self.weights), 4))
 
 #---------------- RETRIEVING DATA AND PROCESSING -------------------------------
-COLUMNS = [
-    "millis","accX","accY","accZ","gyroX","gyroY","gyroZ", "magX","magY","magZ",
-    "latitude","longitude", "gpsAltitude","Speed","SatCount","batteryVoltage"
-]
-GAUSS_COLS = ["accX", "accY", "accZ", "gyroX", "gyroY", "gyroZ", "magX", "magY", "magZ"]
-GPS_COLS   = ["latitude", "longitude"] #without gpsAltitude?
+def _iter_children(node):
+    """Yield (key, value) for either a dict or a list (skipping None)."""
+    if isinstance(node, dict):
+        for k, v in node.items():
+            yield str(k), v
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            if v is not None:
+                yield str(i), v
 
-def to_raw_df(data):
-    if isinstance(data, dict):
-        data = list(data.values())
+def init_firebase():
+    cred = credentials.Certificate(r"D:\Neues Fliegen\Datalogger\Dashboard\Firebase DB\datalogger-nfc25-firebase-adminsdk-fbsvc-9fb825c058.json")
+    if not firebase_admin._apps:
+        firebase_admin.initialize_app(cred, {
+            'databaseURL': r"https://datalogger-nfc25-default-rtdb.europe-west1.firebasedatabase.app"
+        }) 
 
-    good = [p for p in data if isinstance(p, dict) and isinstance(p.get("data"), list) and len(p["data"]) == len(COLUMNS)]
-    if not good:
-        return pd.DataFrame(columns=COLUMNS + ["mode", "ts"])
+def to_df_from_node(node) -> pd.DataFrame:
+    """
+    Expect a FLIGHT node that is a dict of "<millis>" -> [values...] (or dict-row).
+    """
+    if not isinstance(node, dict):
+        return pd.DataFrame(columns=COLUMNS + ["t_s"])
 
-    df = pd.DataFrame([p["data"] for p in good], columns=COLUMNS)
-    df["mode"] = [p.get("mode", "REALTIME") for p in good]
+    n = len(COLUMNS)
+    rows = []
 
-    df["millis"] = pd.to_numeric(df["millis"], errors="coerce").round().astype("Int64")
+    for k, v in node.items():
+        if k in ("MODE", "mode"):
+            continue
+
+        if isinstance(v, (list, tuple)):
+            row = list(v[:n]) + [None] * max(0, n - len(v))
+            if COLUMNS[0] == "millis" and (row[0] is None or (isinstance(row[0], float) and pd.isna(row[0]))):
+                try: row[0] = int(float(k))
+                except: pass
+            rows.append(row)
+
+        elif isinstance(v, dict):
+            row = [v.get(c) for c in COLUMNS]
+            if COLUMNS[0] == "millis" and (row[0] is None or (isinstance(row[0], float) and pd.isna(row[0]))):
+                try: row[0] = int(float(k))
+                except: pass
+            rows.append(row)
+
+    if not rows:
+        return pd.DataFrame(columns=COLUMNS + ["t_s"])
+
+    df = pd.DataFrame(rows, columns=COLUMNS)
+    df["millis"] = pd.to_numeric(df["millis"], errors="coerce").astype("Int64")
     df = df.dropna(subset=["millis"])
+    if df.empty:
+        return pd.DataFrame(columns=COLUMNS + ["t_s"])
+
     df["millis"] = df["millis"].astype("int64")
     base = int(df["millis"].min())
     df["t_s"] = (df["millis"] - base) / 1000.0
-
-    if "SatCount" in df.columns:
-        df["SatCount"] = pd.to_numeric(df["SatCount"], errors="coerce").round().astype("Int64")
-
-    df["ts"] = pd.to_datetime(df["millis"], unit="ms", utc=True)
-    df.sort_values("millis", kind="stable", inplace=True)
-    df.reset_index(drop=True, inplace=True)
+    if ENFORCE_SORT:
+        df = df.sort_values("millis", kind="stable").reset_index(drop=True)
     return df
+
+def flight_key(team: str, flight: str) -> str:
+    return f"{team}-{flight}"
+
+def ensure_state():
+    if "flights" not in st.session_state:
+        st.session_state["flights"] = {}  # key -> {"raw": df, "processed": df, "last_seen_millis": int}
+    if "selected_flight_key" not in st.session_state:
+        st.session_state["selected_flight_key"] = flight_key("1", "1")
+
+def set_flight_state(key: str, raw_df: pd.DataFrame):
+    filters_for_flight(key)
+    processed = process_batch(raw_df)
+    last_seen = int(processed["millis"].max()) if ("millis" in processed.columns and processed["millis"].notna().any()) else -1
+    st.session_state["flights"][key] = {
+        "raw": raw_df,
+        "processed": processed,
+        "last_seen_millis": last_seen,
+    }
+
+def filters_for_flight(key: str):
+    fb = st.session_state.setdefault("filters_by_flight", {})
+    if key not in fb:
+        init_filters()                  # builds st.session_state["filters"]
+        fb[key] = st.session_state["filters"]
+    st.session_state["filters"] = fb[key]  # point to this flight's filters
+
+def append_flight_state(key: str, df_new_raw: pd.DataFrame):
+    if df_new_raw.empty:
+        return
+    filters_for_flight(key)
+    proc_new = process_batch(df_new_raw)
+    cur = st.session_state["flights"].get(key, None)
+    if cur is None:
+        set_flight_state(key, df_new_raw)
+        return
+    combined = pd.concat([cur["processed"], proc_new], ignore_index=True)
+    if "millis" in combined.columns:
+        combined = combined.dropna(subset=["millis"])
+        combined = combined.drop_duplicates(subset=["millis"], keep="last")
+        if ENFORCE_SORT:
+            combined = combined.sort_values("millis", kind="stable")
+        combined = combined.reset_index(drop=True)
+        base = int(combined["millis"].min())
+        combined["t_s"] = (combined["millis"] - base) / 1000.0
+
+    st.session_state["flights"][key]["processed"] = combined
+    st.session_state["flights"][key]["raw"] = combined.copy()
+    st.session_state["flights"][key]["last_seen_millis"] = (
+        int(combined["millis"].max()) if "millis" in combined.columns and combined["millis"].notna().any() else -1
+    )
 
 def init_filters():
     if "filters" not in st.session_state:
@@ -114,19 +201,37 @@ def init_filters():
         for c in GPS_COLS:
             st.session_state["filters"][c] = GPSFilter(window_size=5)
 
-def compute_RPY(accX, accY, accZ, magX, magY, magZ): #implement other later
-    accX = np.asarray(accX, dtype=float)
-    accY = np.asarray(accY, dtype=float)
-    accZ = np.asarray(accZ, dtype=float)
-    magX = np.asarray(magX, dtype=float)
-    magY = np.asarray(magY, dtype=float)
-    magZ = np.asarray(magZ, dtype=float)
-    pitch = np.atan2(accY, np.sqrt((accX * accX) + (accZ * accZ)))
-    roll = np.atan2(-accX , np.sqrt((accY * accY) + (accZ * accZ)))
-    yaw = np.atan2((magY * np.cos(roll)) - (magZ * np.sin(roll)), (magX * np.cos(pitch)) + (magY * np.sin(roll)*np.sin(pitch)) + (magZ * np.cos(roll) * np.sin(pitch)))
-    roll_deg = np.degrees(roll)
-    pitch_deg = np.degrees(pitch)
-    yaw_deg = np.degrees(yaw)
+def initial_load_all_flights():
+    all_live = db.reference("/live").get() or {}
+    found_any = False
+
+    for team_key, team_node in _iter_children(all_live):
+        for fl_key, flight_node in _iter_children(team_node):
+            key = flight_key(str(team_key), str(fl_key))  # e.g., "1-1"
+            df = to_df_from_node(flight_node)
+            set_flight_state(key, df)
+            found_any = True
+
+    if not found_any:
+        st.info("No flights found under /live yet.")
+
+def fetch_selected_incremental(selected_key: str):
+    """Only refresh the selected flight, pulling any rows with millis > last_seen."""
+    if "-" not in selected_key:
+        return
+    team, fl = selected_key.split("-", 1)
+    path = f"/live/{team}/{fl}"
+    node = db.reference(path).get() or {}
+    df_all = to_df_from_node(node)
+
+    last_seen = st.session_state["flights"].get(selected_key, {}).get("last_seen_millis", -1)
+    if "millis" in df_all.columns and df_all["millis"].notna().any() and last_seen >= 0:
+        df_new = df_all[df_all["millis"] > last_seen].copy()
+    else:
+        # If millis is missing or last_seen is unknown, conservatively treat as no new rows
+        df_new = pd.DataFrame(columns=df_all.columns)
+
+    append_flight_state(selected_key, df_new)
 
 def distanceBetween(lat1, lon1, lat2, lon2) -> float:
     try:
@@ -173,106 +278,8 @@ def recompute_all_distance():
     lon_col = "longitude_f" if "longitude_f" in df.columns else "longitude"
     if lat_col not in df.columns or lon_col not in df.columns:
         return
-    df.sort_values("millis", kind="stable", inplace=True, ignore_index=True)
+    #df.sort_values("millis", kind="stable", inplace=True, ignore_index=True)
     append_cum_distance(df, lat_col, lon_col)
-
-
-def process_batch(raw_df: pd.DataFrame) -> pd.DataFrame:
-    if raw_df is None or raw_df.empty:
-        return raw_df
-
-    #df_out = raw_df.sort_values("millis", kind="stable").reset_index(drop=True).copy()
-
-    # --- Gaussian-filtered sensor columns (stateful, per column) ---
-    for col in GAUSS_COLS:
-        filt = st.session_state["filters"].get(col)
-        if filt is None or col not in df_out.columns:
-            continue
-        out = []
-        for v in df_out[col].to_numpy():
-            out.append(filt.update(float(v)))
-        df_out[f"{col}_f"] = out
-
-    # --- GPS-filtered columns: each uses satellite count as weights ---
-    sat_col = "satCount" if "satCount" in df_out.columns else ("SatCount" if "SatCount" in df_out.columns else None)
-    if sat_col is not None:
-        for col in GPS_COLS:
-            filt = st.session_state["filters"].get(col)
-            if filt is None or col not in df_out.columns:
-                continue
-            out = []
-            for val, sc in zip(df_out[col].to_numpy(), df_out[sat_col].to_numpy()):
-                out.append(filt.update(float(val), int(sc)))
-            df_out[f"{col}_f"] = out
-    else:
-        # If there is no satellite count, fall back to raw (or skip)
-        for col in GPS_COLS:
-            if col in df_out.columns:
-                df_out[f"{col}_f"] = df_out[col].to_numpy()
-    
-    # --- Calculate Roll Pitch Yaw (in degrees)---
-    df_out[["roll", "pitch", "yaw"]] = compute_RPY(df_out["accX"], df_out["accY"], df_out["accZ"], df_out["magX"], df_out["magY"], df_out["magZ"])
-
-    # --- Calculate distance travelled (meters) ---
-    lat_col = "latitude_f"  if "latitude_f"  in df_out.columns else "latitude"
-    lon_col = "longitude_f" if "longitude_f" in df_out.columns else "longitude"
-    if lat_col in df_out.columns and lon_col in df_out.columns:
-        append_cum_distance(df_out, lat_col, lon_col)
-    return df_out
-
-def append_state(new_raw, new_processed):
-    st.session_state["raw_df"] = (
-        pd.concat([st.session_state["raw_df"], new_raw], ignore_index=True)
-        if "raw_df" in st.session_state else new_raw
-    )
-    st.session_state["processed_df"] = (
-        pd.concat([st.session_state["processed_df"], new_processed], ignore_index=True)
-        if "processed_df" in st.session_state else new_processed
-    )
-    if not st.session_state["raw_df"].empty:
-        st.session_state["last_seen_millis"] = int(st.session_state["raw_df"]["millis"].max())
-
-def fetch_new_data(node: str, last_seen_millis: int, limit=5000):
-    ref = db.reference(node)
-    snap = (ref.order_by_child("millis")
-                .start_at(last_seen_millis + 1)  # strictly greater than last seen
-                .limit_to_first(limit)
-                .get())
-    return snap or {}
-
-#if "archived_flights_df" not in st.session_state:
-#    st.session_state["archived_flights_df"] = {
-#        k: g.copy()
-#        for k, g in st.session_state["raw_df_archive"].groupby("flight_name")
-#    }
-
-#if "live_flights_df" not in st.session_state:
-#    st.session_state["live_flights_df"] = {
-#        k: g.copy()
-#        for k, g in st.session_state["raw_df_live"].groupby("flight_name")
-#    }
-#archive_keys = list(st.session_state["archived_flights_df"].keys())
-#live_keys = list(st.session_state["live_flights_df"].keys())
-
-
-# --- Getting initial load ---
-if "raw_df" not in st.session_state:
-    ref = db.reference('/live')
-    data = (ref.get() or {})
-    init_filters()
-    df_raw = to_raw_df(data)
-    if not df_raw.empty:
-        df_processed = process_batch(df_raw)   # no distance here
-        append_state(df_raw, df_processed)
-        recompute_all_distance()               # compute on WHOLE processed_df
-
-# --- Fetch new data ---
-new_data = fetch_new_data('/live', st.session_state.get("last_seen_millis", -1))
-df_new_raw = to_raw_df(new_data)
-if not df_new_raw.empty:
-    df_new_processed = process_batch(df_new_raw)  # no distance here
-    append_state(df_new_raw, df_new_processed)
-    recompute_all_distance()                      # recompute once on all rows
 
 
 #---------------- PLOTTING DATA --------------------------------------------
@@ -330,6 +337,16 @@ def display_gyro(df):
         labels={"t_s": "Time (s)", "Angular Acceleration": "degrees / sec"},
     )
     fig.update_yaxes(range=[-90, 90])
+    st.plotly_chart(fig, use_container_width=True)
+
+def display_altitude(df):
+    fig = px.line(
+        df,
+        x="t_s",
+        y="gpsAltitude",
+        title="Altitude",
+        labels={"t_s" : "Time (s)", "gpsAltitude" : "Altitude (m)"}
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 # ---------- “current-value only” widgets ----------------
@@ -393,6 +410,14 @@ def display_singleSpeed(selected_flight):
 
     st.metric("Speed",  f"{latest['Speed']:.1f}", f"{latest['Speed']-prev['Speed']:+.1f}")
 
+def display_singleAltitude(df):
+    if df.empty:
+        st.info("No altitude data yet."); return
+    
+    latest = df.iloc[-1]
+    prev   = df.iloc[-2] if len(df) > 1 else latest
+    st.metric("Altitude (m)",  f"{latest['gpsAltitude']:.1f}", f"{latest['gpsAltitude']-prev['gpsAltitude']:+.1f}")
+
 def display_map(selected_flight):
     df = pd.DataFrame(selected_flight)
     if df.empty:
@@ -421,48 +446,71 @@ def display_battery(selected_flight):
 
 # --- Display live flight ---
 def display_live_flight(selected_live):
-    col1, col2, col3, col4 = st.columns(4)
+    state = st.session_state["flights"].get(selected_live, None)
+    if state is state["processed"].empty:
+        st.warning("This flight is empty.")
+        return
+    df = state["processed"]          # <-- DataFrame
+    col1, col2, col3 = st.columns(3)
     with col1:
-        display_singleSpeed(selected_live)
-        display_speed(selected_live)
+        display_singleSpeed(df)
+        display_speed(df)
 
     with col2:
-        display_singleAcc(selected_live)
-        display_acc(selected_live)    
+        display_singleAcc(df)
+        display_acc(df)    
 
     with col3:
-        display_singleRPY(selected_live)
-        display_rpy(selected_live)
+        display_singleGyro(df)
+        display_gyro(df)
 
+    col4, col5 = st.columns(2)
     with col4:
-        display_singleGyro(selected_live)
-        display_gyro(selected_live)
-    
-    display_map(selected_live)
-    
-    display_distance_travelled(selected_live)
+        display_singleRPY(df)
+        display_rpy(df)
+    with col5:
+        display_singleAltitude(df)
+        display_altitude(df)
 
-    display_battery(selected_live)
-
+    display_map(df)
+    
+    display_distance_travelled(df)
+    display_battery(df)
 
 # --- Streamlit functions - Front end ---
 
 def show_live_dashboard():
+    st.set_page_config(layout="wide")
+    st.header("Dashboard (Live)")
     
-    #if not get_live_flights(): #standby page
-    #    st.subheader("🛬  Stand-by — waiting for next flight")
-    #    st.info("Drop a new CSV into Firebase to begin streaming.")
-    #    st_autorefresh(interval=STANDARD_REFRESH, key="standard_refresh")
-    #else:
-    #    selected_live = st.selectbox("Watch flight:", live_keys)
-    
-    display_live_flight(st.session_state['processed_df']) #change later
+    options = [flight_key(team, fl) for team in TEAMS for fl in FLIGHTS]
+    selected = st.selectbox(
+        "Select Team / Flight",
+        options=options,
+        index=options.index(st.session_state["selected_flight_key"]) if st.session_state["selected_flight_key"] in options else 0,
+        key="selected_flight_key",
+    )
 
-st.set_page_config(layout="wide")
-st.header("Dashboard (Live)")
+    # --- Only update the selected flight ---
+    fetch_selected_incremental(selected)
 
-show_live_dashboard()
+    # --- Display selected flight ---
+    display_live_flight(selected)
+
+def main():
+    init_firebase()
+    ensure_state()
+
+    # Initial one-time load for all flights (creates empty frames for missing/empty nodes)
+    if not st.session_state["flights"]:
+        initial_load_all_flights()
+
+    show_live_dashboard()
+
+if __name__ == "__main__":
+    main()
     
+
 
 
 

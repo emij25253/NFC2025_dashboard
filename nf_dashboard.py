@@ -282,6 +282,45 @@ def recompute_all_distance():
     #df.sort_values("millis", kind="stable", inplace=True, ignore_index=True)
     append_cum_distance(df, lat_col, lon_col)
 
+def process_batch(raw_df: pd.DataFrame) -> pd.DataFrame:
+    if raw_df is None or raw_df.empty:
+        return raw_df
+
+    df_out = raw_df.copy()
+
+    if "millis" in df_out.columns:
+        df_out["millis"] = pd.to_numeric(df_out["millis"], errors="coerce").astype("Int64")
+        if df_out["millis"].notna().any():
+            base = int(df_out["millis"].min())
+            df_out["t_s"] = (df_out["millis"] - base) / 1000.0
+
+    # Gaussian filters
+    for col in GAUSS_COLS:
+        filt = st.session_state["filters"].get(col)
+        if filt is None or col not in df_out.columns:
+            continue
+        out = []
+        for v in df_out[col].to_numpy():
+            out.append(filt.update(float(v)))
+        df_out[f"{col}_f"] = out
+
+    # GPS filters
+    sat_col = "satCount" if "satCount" in df_out.columns else ("SatCount" if "SatCount" in df_out.columns else None)
+    if sat_col is not None:
+        for col in GPS_COLS:
+            filt = st.session_state["filters"].get(col)
+            if filt is None or col not in df_out.columns:
+                continue
+            out = []
+            for val, sc in zip(df_out[col].to_numpy(), df_out[sat_col].to_numpy()):
+                out.append(filt.update(float(val), 0 if pd.isna(sc) else int(sc)))
+            df_out[f"{col}_f"] = out
+    else:
+        for col in GPS_COLS:
+            if col in df_out.columns:
+                df_out[f"{col}_f"] = df_out[col].to_numpy()
+
+    return df_out
 
 #---------------- PLOTTING DATA --------------------------------------------
 
@@ -510,6 +549,7 @@ def main():
 if __name__ == "__main__":
     main()
     
+
 
 
 

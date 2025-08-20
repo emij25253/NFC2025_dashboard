@@ -336,7 +336,7 @@ def process_batch(raw_df: pd.DataFrame) -> pd.DataFrame:
     if raw_df is None or raw_df.empty:
         return raw_df
 
-    df_out = raw_df.copy #HERE REMOVED .COPY
+    df_out = raw_df.copy(deep=False) #HERE REMOVED .COPY
 
     if "millis" in df_out.columns:
         df_out["millis"] = pd.to_numeric(df_out["millis"], errors="coerce").astype("Int64")
@@ -600,6 +600,7 @@ def main():
 if __name__ == "__main__":
     main()
     
+
 
 
 

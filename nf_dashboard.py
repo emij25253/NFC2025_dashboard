@@ -309,8 +309,8 @@ def append_cum_distance(df: pd.DataFrame, lat_col_name: str, lon_col_name: str):
     seg[~ok] = 0.0
     if seg.size: seg[0] = 0.0
     
-    df["segmentDistance"]   = seg_dist
-    df["distanceTravelled"] = np.cumsum(seg_dist)
+    df["segmentDistance"]   = seg #removed _dist
+    df["distanceTravelled"] = np.cumsum(seg) #removed _dist
 
 def recompute_all_distance():
     key = st.session_state.get("selected_flight_key")
@@ -600,6 +600,7 @@ def main():
 if __name__ == "__main__":
     main()
     
+
 
 
 

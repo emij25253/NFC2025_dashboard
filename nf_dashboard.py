@@ -239,11 +239,19 @@ def fetch_selected_incremental(selected_key: str):
     df_all = to_df_from_node(node)
 
     last_seen = st.session_state["flights"].get(selected_key, {}).get("last_seen_millis", -1)
-    if "millis" in df_all.columns and df_all["millis"].notna().any() and last_seen >= 0:
-        df_new = df_all[df_all["millis"] > last_seen].copy()
+    if last_seen < 0:
+        # First time we ever look at this flight: take ALL rows
+        df_new = df_all
     else:
+        if "millis" in df_all.columns and df_all["millis"].notna().any():
+            df_new = df_all[df_all["millis"] > last_seen].copy()
+        else:
+            df_new = pd.DataFrame(columns=df_all.columns)
+    #if "millis" in df_all.columns and df_all["millis"].notna().any() and last_seen >= 0:
+        #df_new = df_all[df_all["millis"] > last_seen].copy()
+    #else:
         # If millis is missing or last_seen is unknown, conservatively treat as no new rows
-        df_new = pd.DataFrame(columns=df_all.columns)
+        #df_new = pd.DataFrame(columns=df_all.columns)
 
     append_flight_state(selected_key, df_new)
 
@@ -600,6 +608,7 @@ def main():
 if __name__ == "__main__":
     main()
     
+
 
 
 

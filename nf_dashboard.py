@@ -9,7 +9,7 @@ from streamlit_autorefresh import st_autorefresh
 import plotly.express as px
 from typing import Dict, Any, Tuple
 
-LIVE_REFRESH = 100 #app refresh when live (ms)
+LIVE_REFRESH = 500 #app refresh when live (ms)
 STANDARD_REFRESH = 5000 #app refresh for archive (ms)
 TEAMS = [str(i) for i in range(1, 10)]      # "1".."9"
 FLIGHTS = [str(i) for i in range(1, 5)]     # "1".."4"
@@ -21,7 +21,7 @@ COLUMNS = [
 GAUSS_COLS = ["accX", "accY", "accZ", "gyroX", "gyroY", "gyroZ", "magX", "magY", "magZ"]
 GPS_COLS   = ["latitude", "longitude"] #without gpsAltitude?
 
-interval = STANDARD_REFRESH
+interval = LIVE_REFRESH
 st_autorefresh(interval=interval, key="app_refresh")
 
 
@@ -363,6 +363,7 @@ def display_acc(selected_flight):
         title="Acceleration",
         labels={"t_s": "Time (s)", "Acceleration": "G"}
     )
+    fig.update_yaxes(range=[-0.5, 3])
     st.plotly_chart(fig, use_container_width=True)
 
 def display_speed(selected_flight):
@@ -576,6 +577,7 @@ def main():
 if __name__ == "__main__":
     main()
     
+
 
 
 

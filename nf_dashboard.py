@@ -194,7 +194,13 @@ def append_flight_state(key: str, df_new_raw: pd.DataFrame):
         combined = combined.reset_index(drop=True)
         base = int(combined["millis"].min())
         combined["t_s"] = (combined["millis"] - base) / 1000.0
-
+        
+     # --- distance columns ---
+    lat_col = "latitude_f"  if "latitude_f"  in combined.columns else "latitude"
+    lon_col = "longitude_f" if "longitude_f" in combined.columns else "longitude"
+    if lat_col in combined.columns and lon_col in combined.columns and not combined.empty:
+        append_cum_distance(combined, lat_col, lon_col)
+        
     st.session_state["flights"][key]["processed"] = combined
     st.session_state["flights"][key]["raw"] = combined.copy()
     st.session_state["flights"][key]["last_seen_millis"] = (
@@ -570,6 +576,7 @@ def main():
 if __name__ == "__main__":
     main()
     
+
 
 
 

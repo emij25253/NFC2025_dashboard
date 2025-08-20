@@ -285,6 +285,13 @@ def append_cum_distance(df: pd.DataFrame, lat_col_name: str, lon_col_name: str):
     lat_prev = np.roll(lat, 1); lat_prev[0] = lat[0]
     lon_prev = np.roll(lon, 1); lon_prev[0] = lon[0]
 
+    ok = (
+        np.isfinite(lat) & np.isfinite(lon) &
+        np.isfinite(lat_prev) & np.isfinite(lon_prev) &
+        (lat != 0) & (lon != 0) & (lat_prev != 0) & (lon_prev != 0) &
+        (np.abs(lat) <= 90) & (np.abs(lon) <= 180) &
+        (np.abs(lat_prev) <= 90) & (np.abs(lon_prev) <= 180)
+    )
     #vec_dist = np.vectorize(distanceBetween, otypes=[float])
     #seg_dist = vec_dist(lat_prev, lon_prev, lat, lon)
     #if seg_dist.size:
@@ -297,6 +304,8 @@ def append_cum_distance(df: pd.DataFrame, lat_col_name: str, lon_col_name: str):
     a = np.sin(dphi/2)**2 + np.cos(phi1)*np.cos(phi2)*np.sin(dlmb/2)**2
     seg = 2 * R * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
 
+
+    
     seg[~ok] = 0.0
     if seg.size: seg[0] = 0.0
     
@@ -591,6 +600,7 @@ def main():
 if __name__ == "__main__":
     main()
     
+
 
 
 

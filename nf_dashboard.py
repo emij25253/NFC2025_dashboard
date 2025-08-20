@@ -270,6 +270,10 @@ def distanceBetween(lat1, lon1, lat2, lon2) -> float:
     return 2 * 6_371_000.0 * atan2(sqrt(a), sqrt(1 - a))
 
 def append_cum_distance(df: pd.DataFrame, lat_col_name: str, lon_col_name: str):
+    if df.empty: 
+        df["segmentDistance"] = []
+        df["distanceTravelled"] = []
+        return
     # get numeric arrays
     lat = pd.to_numeric(df[lat_col_name], errors="coerce").to_numpy(dtype=float)
     lon = pd.to_numeric(df[lon_col_name], errors="coerce").to_numpy(dtype=float)
@@ -281,11 +285,21 @@ def append_cum_distance(df: pd.DataFrame, lat_col_name: str, lon_col_name: str):
     lat_prev = np.roll(lat, 1); lat_prev[0] = lat[0]
     lon_prev = np.roll(lon, 1); lon_prev[0] = lon[0]
 
-    vec_dist = np.vectorize(distanceBetween, otypes=[float])
-    seg_dist = vec_dist(lat_prev, lon_prev, lat, lon)
-    if seg_dist.size:
-        seg_dist[0] = 0.0
+    #vec_dist = np.vectorize(distanceBetween, otypes=[float])
+    #seg_dist = vec_dist(lat_prev, lon_prev, lat, lon)
+    #if seg_dist.size:
+        #seg_dist[0] = 0.0
+    #SIMPLE NUMPY CALC - NO DISTANCEBETWEEN FUNCTION
+    R = 6_371_000.0
+    phi1 = np.radians(lat_prev); phi2 = np.radians(lat)
+    dphi = np.radians(lat - lat_prev)
+    dlmb = np.radians(lon - lon_prev)
+    a = np.sin(dphi/2)**2 + np.cos(phi1)*np.cos(phi2)*np.sin(dlmb/2)**2
+    seg = 2 * R * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
 
+    seg[~ok] = 0.0
+    if seg.size: seg[0] = 0.0
+    
     df["segmentDistance"]   = seg_dist
     df["distanceTravelled"] = np.cumsum(seg_dist)
 
@@ -577,6 +591,7 @@ def main():
 if __name__ == "__main__":
     main()
     
+
 
 
 

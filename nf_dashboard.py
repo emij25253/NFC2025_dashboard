@@ -155,6 +155,13 @@ def ensure_state():
 def set_flight_state(key: str, raw_df: pd.DataFrame):
     filters_for_flight(key)
     processed = process_batch(raw_df)
+
+    # --- distance columns ---
+    lat_col = "latitude_f"  if "latitude_f"  in processed.columns else "latitude"
+    lon_col = "longitude_f" if "longitude_f" in processed.columns else "longitude"
+    if lat_col in processed.columns and lon_col in processed.columns and not processed.empty:
+        append_cum_distance(processed, lat_col, lon_col)
+    
     last_seen = int(processed["millis"].max()) if ("millis" in processed.columns and processed["millis"].notna().any()) else -1
     st.session_state["flights"][key] = {
         "raw": raw_df,
@@ -256,31 +263,45 @@ def distanceBetween(lat1, lon1, lat2, lon2) -> float:
     
     return 2 * 6_371_000.0 * atan2(sqrt(a), sqrt(1 - a))
 
-def append_cum_distance(df, lat_col, lon_col):
-    lat = pd.to_numeric(df[lat_col], errors="coerce").to_numpy(dtype=float)
-    lon = pd.to_numeric(df[lon_col], errors="coerce").to_numpy(dtype=float)
+def append_cum_distance(df: pd.DataFrame, lat_col_name: str, lon_col_name: str):
+    # get numeric arrays
+    lat = pd.to_numeric(df[lat_col_name], errors="coerce").to_numpy(dtype=float)
+    lon = pd.to_numeric(df[lon_col_name], errors="coerce").to_numpy(dtype=float)
+    if lat.size == 0 or lon.size == 0:
+        df["segmentDistance"] = []
+        df["distanceTravelled"] = []
+        return
 
     lat_prev = np.roll(lat, 1); lat_prev[0] = lat[0]
     lon_prev = np.roll(lon, 1); lon_prev[0] = lon[0]
 
     vec_dist = np.vectorize(distanceBetween, otypes=[float])
     seg_dist = vec_dist(lat_prev, lon_prev, lat, lon)
-    seg_dist[0] = 0.0
+    if seg_dist.size:
+        seg_dist[0] = 0.0
 
     df["segmentDistance"]   = seg_dist
     df["distanceTravelled"] = np.cumsum(seg_dist)
 
 def recompute_all_distance():
-    df = st.session_state.get("processed_df")
+    key = st.session_state.get("selected_flight_key")
+    flights = st.session_state.get("flights", {})
+    cur = flights.get(key)
+    if not cur:
+        return
+
+    df = cur.get("processed")
     if df is None or df.empty:
         return
-    # Prefer filtered columns if available
-    lat_col = "latitude_f" if "latitude_f" in df.columns else "latitude"
+
+    lat_col = "latitude_f"  if "latitude_f"  in df.columns else "latitude"
     lon_col = "longitude_f" if "longitude_f" in df.columns else "longitude"
     if lat_col not in df.columns or lon_col not in df.columns:
         return
-    #df.sort_values("millis", kind="stable", inplace=True, ignore_index=True)
-    append_cum_distance(df, lat_col, lon_col)
+
+    append_cum_distance(df, lat_col, lon_col)    # <- actually compute distances
+    # write back
+    st.session_state["flights"][key]["processed"] = df
 
 def process_batch(raw_df: pd.DataFrame) -> pd.DataFrame:
     if raw_df is None or raw_df.empty:
@@ -549,6 +570,7 @@ def main():
 if __name__ == "__main__":
     main()
     
+
 
 
 

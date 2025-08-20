@@ -363,7 +363,7 @@ def display_acc(selected_flight):
         title="Acceleration",
         labels={"t_s": "Time (s)", "Acceleration": "G"}
     )
-    fig.update_yaxes(range=[-0.5, 3])
+    fig.update_yaxes(range=[-3, 3])
     st.plotly_chart(fig, use_container_width=True)
 
 def display_speed(selected_flight):
@@ -380,7 +380,7 @@ def display_speed(selected_flight):
 
 def display_rpy(selected_flight): #calcuate rpy
     df = pd.DataFrame(selected_flight)
-    df_melted = df.melt(id_vars=["t_s"], value_vars=["gyroX", "gyroY", "gyroZ"], var_name="Axis", value_name="Attitude")
+    df_melted = df.melt(id_vars=["t_s"], value_vars=["roll", "pitch", "yaw"], var_name="Axis", value_name="Attitude")
 
     fig = px.line(
         df_melted,
@@ -446,11 +446,11 @@ def display_singleRPY(selected_flight):
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.metric("Roll (°)",  f"{latest['gyroX']:.1f}", f"{latest['gyroX']-prev['gyroX']:+.1f}")
+        st.metric("Roll (°)",  f"{latest['roll']:.1f}", f"{latest['roll']-prev['roll']:+.1f}")
     with c2:
-        st.metric("Pitch (°)", f"{latest['gyroY']:.1f}", f"{latest['gyroY']-prev['gyroY']:+.1f}")
+        st.metric("Pitch (°)", f"{latest['pitch']:.1f}", f"{latest['pitch']-prev['pitch']:+.1f}")
     with c3:
-        st.metric("Yaw (°)",   f"{latest['gyroZ']:.1f}", f"{latest['gyroZ']-prev['gyroZ']:+.1f}")
+        st.metric("Yaw (°)",   f"{latest['yaw']:.1f}", f"{latest['yaw']-prev['yaw']:+.1f}")
 
 def display_singleGyro(df):
         
@@ -577,6 +577,7 @@ def main():
 if __name__ == "__main__":
     main()
     
+
 
 
 

@@ -202,7 +202,7 @@ def append_flight_state(key: str, df_new_raw: pd.DataFrame):
         append_cum_distance(combined, lat_col, lon_col)
         
     st.session_state["flights"][key]["processed"] = combined
-    st.session_state["flights"][key]["raw"] = combined.copy()
+    #st.session_state["flights"][key]["raw"] = combined.copy() #HERE
     st.session_state["flights"][key]["last_seen_millis"] = (
         int(combined["millis"].max()) if "millis" in combined.columns and combined["millis"].notna().any() else -1
     )
@@ -577,6 +577,7 @@ def main():
 if __name__ == "__main__":
     main()
     
+
 
 
 

@@ -18,7 +18,7 @@ COLUMNS = [
     "millis","accX","accY","accZ","gyroX","gyroY","gyroZ", "magX","magY","magZ",
     "latitude","longitude", "gpsAltitude","Speed","SatCount","batteryVoltage", "roll", "pitch", "yaw"
 ]
-#GAUSS_COLS = ["accX", "accY", "accZ", "gyroX", "gyroY", "gyroZ", "magX", "magY", "magZ"]
+GAUSS_COLS = []#"accX", "accY", "accZ", "gyroX", "gyroY", "gyroZ", "magX", "magY", "magZ"]
 GPS_COLS   = ["latitude", "longitude"] #without gpsAltitude?
 
 interval = LIVE_REFRESH
@@ -608,6 +608,7 @@ def main():
 if __name__ == "__main__":
     main()
     
+
 
 
 
